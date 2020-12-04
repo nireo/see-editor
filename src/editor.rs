@@ -1,11 +1,14 @@
 use crate::Terminal;
-use std::io::{self, stdout};
+use crate::Document;
+use std::io::stdout;
 use termion::event::Key;
-use termion::input::TermRead;
+use std::env;
+use crate::Row;
 use termion::raw::IntoRawMode;
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 
+#[derive(Default)]
 pub struct Position {
     pub x: usize,
     pub y: usize,
@@ -15,6 +18,8 @@ pub struct Editor {
     quit: bool,
     terminal: Terminal,
     cursor_position: Position,
+    offset: Position,
+    document: Document,
 }
 
 impl Editor {
@@ -50,13 +55,14 @@ impl Editor {
             | Key::Home => self.move_cursor(pressed_key),
             _ => (),
         }
+        self.scroll();
         Ok(())
     }
 
     fn refresh_editor(&self) -> Result<(), std::io::Error> {
         Terminal::cursor_hide();
         Terminal::clear_screen();
-        Terminal::cursor_position(&Position { x: 0, y: 0 });
+        Terminal::cursor_position(&Position::default());
 
         if self.quit {
             Terminal::clear_screen();
@@ -71,10 +77,38 @@ impl Editor {
     }
 
     pub fn default() -> Self {
+        let args: Vec<String> = env::args().collect();
+        let document = if args.len() > 1 {
+            let file_name = &args[1];
+            Document::open(&file_name).unwrap_or_default()
+        } else {
+            Document::default()
+        };
+
         Self {
             quit: false,
             terminal: Terminal::default().expect("failed to initialize terminal"),
-            cursor_position: Position { x: 0, y: 0 },
+            cursor_position: Position::default(),
+            document: document,
+            offset: Position::default(),
+        }
+    }
+
+    pub fn scroll(&mut self) {
+        let Position { x, y } = self.cursor_position;
+        let width = self.terminal.size().width as usize;
+        let height = self.terminal.size().height as usize;
+        let mut offset = &mut self.offset;
+        if y < offset.y {
+            offset.y = y;
+        } else if y >= offset.y.saturating_add(height) {
+            offset.y = y.saturating_sub(height).saturating_add(1);
+        }
+
+        if x < offset.x {
+            offset.x = x;
+        } else if x >= offset.x.saturating_add(width) {
+            offset.x = x.saturating_sub(width).saturating_add(1);
         }
     }
 
@@ -116,23 +150,25 @@ impl Editor {
         self.cursor_position = Position { x, y }
     }
 
+    pub fn draw_row(&self, row: &Row) {
+        let width = self.terminal.size().width as usize;
+        let start = self.offset.x;
+        let end = self.offset.x + width;
+        let row = row.render(start, end);
+        println!("{}\r", row)
+    }
+
     fn draw_tildes(&self) {
         let height = self.terminal.size().height;
-        for row in 0..height - 1 {
+        for terminal_row in 0..height - 1 {
             Terminal::clear_current_line();
-            if row == height / 3 {
+            if let Some(row) = self.document.row(terminal_row as usize+ self.offset.y) {
+                self.draw_row(row);
+            } else if self.document.is_empty() && terminal_row == height / 3 {
                 self.draw_welcome_message();
             } else {
                 println!("~\r");
             }
-        }
-    }
-}
-
-fn read_key() -> Result<Key, std::io::Error> {
-    loop {
-        if let Some(key) = io::stdin().lock().keys().next() {
-            return key;
         }
     }
 }
