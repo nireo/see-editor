@@ -62,17 +62,28 @@ impl Editor {
         }
     }
 
+    fn handle_file_save(&mut self) {
+        if self.document.file_name.is_none() {
+            let new_name = self.prompt("save as: ").unwrap_or(None);
+            if new_name.is_none() {
+                self.status_message = StatusMessage::from("save stopped".to_string());
+                return;
+            }
+            self.document.file_name = new_name;
+        }
+
+        if self.document.save().is_ok() {
+            self.status_message = StatusMessage::from("file saved".to_string());
+        } else {
+            self.status_message = StatusMessage::from("error writing file".to_string());
+        }
+    }
+
     fn process_press(&mut self) -> Result<(), std::io::Error> {
         let pressed_key = Terminal::read_key()?;
         match pressed_key {
             Key::Ctrl('q') => self.quit = true,
-            Key::Ctrl('s') => {
-                if self.document.save().is_ok() {
-                    self.status_message = StatusMessage::from("file saved".to_string());
-                } else {
-                    self.status_message = StatusMessage::from("could not save file.".to_string());
-                }
-            },
+            Key::Ctrl('s') =>  self.handle_file_save(),
             Key::Char(c) => {
                 self.document.insert(&self.cursor_position, c);
                 self.move_cursor(Key::Right);
@@ -96,6 +107,40 @@ impl Editor {
         }
         self.scroll();
         Ok(())
+    }
+
+    fn prompt(&mut self, prompt: &str) -> Result<Option<String>, std::io::Error> {
+        let mut result = String::new();
+        loop {
+            self.status_message = StatusMessage::from(format!("{}{}", prompt, result));
+            self.refresh_editor()?;
+
+            match Terminal::read_key()? {
+                Key::Backspace => {
+                    if !result.is_empty() {
+                        result.truncate(result.len()-1);
+                    }
+                },
+                Key::Char('\n') => break,
+                Key::Char(c) => {
+                    if !c.is_control() {
+                        result.push(c);
+                    }
+                },
+                Key::Esc => {
+                    result.truncate(0);
+                    break;
+                }
+                _ => (),
+            }
+        }
+
+        self.status_message = StatusMessage::from(String::new());
+        if result.is_empty() {
+            return Ok(None);
+        }
+
+        Ok(Some(result))
     }
 
     fn refresh_editor(&self) -> Result<(), std::io::Error> {
