@@ -66,6 +66,13 @@ impl Editor {
         let pressed_key = Terminal::read_key()?;
         match pressed_key {
             Key::Ctrl('q') => self.quit = true,
+            Key::Ctrl('s') => {
+                if self.document.save().is_ok() {
+                    self.status_message = StatusMessage::from("file saved".to_string());
+                } else {
+                    self.status_message = StatusMessage::from("could not save file.".to_string());
+                }
+            },
             Key::Char(c) => {
                 self.document.insert(&self.cursor_position, c);
                 self.move_cursor(Key::Right);
@@ -116,7 +123,7 @@ impl Editor {
 
     pub fn default() -> Self {
         let args: Vec<String> = env::args().collect();
-        let mut initial_status = String::from("Ctrl-Q quit");
+        let mut initial_status = String::from("Ctrl-Q quit | Crtl-S save");
         let document = if args.len() > 1 {
             let file_name = &args[1];
             let doc = Document::open(&file_name);
