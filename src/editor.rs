@@ -1,20 +1,20 @@
-use crate::Terminal;
 use crate::Document;
-use std::io::stdout;
-use termion::event::Key;
-use std::env;
-use termion::color;
 use crate::Row;
-use termion::raw::IntoRawMode;
+use crate::Terminal;
+use std::env;
+use std::io::stdout;
 use std::time::Duration;
 use std::time::Instant;
+use termion::color;
+use termion::event::Key;
+use termion::raw::IntoRawMode;
 
 const STATUS_BG_COLOR: color::Rgb = color::Rgb(239, 239, 239);
-const STATUS_FG_COLOR: color::Rgb = color::Rgb(63, 63, 63);            
+const STATUS_FG_COLOR: color::Rgb = color::Rgb(63, 63, 63);
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 
-#[derive(Default)]
+#[derive(Default, Clone)]
 pub struct Position {
     pub x: usize,
     pub y: usize,
@@ -64,7 +64,7 @@ impl Editor {
 
     fn handle_file_save(&mut self) {
         if self.document.file_name.is_none() {
-            let new_name = self.prompt("save as: ").unwrap_or(None);
+            let new_name = self.prompt("save as: ", |_, _, _| {}).unwrap_or(None);
             if new_name.is_none() {
                 self.status_message = StatusMessage::from("save stopped".to_string());
                 return;
@@ -79,22 +79,45 @@ impl Editor {
         }
     }
 
+    fn search(&mut self) {
+        let old_position = self.cursor_position.clone();
+        if let Some(query) = self
+            .prompt("search: ", |editor, _, query| {
+                if let Some(position) = editor.document.find(&query) {
+                    editor.cursor_position = position;
+                    editor.scroll();
+                }
+            })
+            .unwrap_or(None)
+        {
+            if let Some(position) = self.document.find(&query[..]) {
+                self.cursor_position = position;
+            } else {
+                self.status_message = StatusMessage::from(format!("{} not found", query));
+            }
+        } else {
+            self.cursor_position = old_position;
+            self.scroll();
+        }
+    }
+
     fn process_press(&mut self) -> Result<(), std::io::Error> {
         let pressed_key = Terminal::read_key()?;
         match pressed_key {
             Key::Ctrl('q') => self.quit = true,
-            Key::Ctrl('s') =>  self.handle_file_save(),
+            Key::Ctrl('s') => self.handle_file_save(),
+            Key::Ctrl('f') => self.search(),
             Key::Char(c) => {
                 self.document.insert(&self.cursor_position, c);
                 self.move_cursor(Key::Right);
-            },
+            }
             Key::Delete => self.document.delete(&self.cursor_position),
             Key::Backspace => {
                 if self.cursor_position.x > 0 || self.cursor_position.y > 0 {
                     self.move_cursor(Key::Left);
                     self.document.delete(&self.cursor_position);
                 }
-            },
+            }
             Key::Up
             | Key::Down
             | Key::Left
@@ -109,30 +132,36 @@ impl Editor {
         Ok(())
     }
 
-    fn prompt(&mut self, prompt: &str) -> Result<Option<String>, std::io::Error> {
+    fn prompt<C>(&mut self, prompt: &str, callback: C) -> Result<Option<String>, std::io::Error>
+    where
+        C: Fn(&mut Self, Key, &String),
+    {
         let mut result = String::new();
         loop {
             self.status_message = StatusMessage::from(format!("{}{}", prompt, result));
             self.refresh_editor()?;
 
-            match Terminal::read_key()? {
+            let key = Terminal::read_key()?;
+            match key {
                 Key::Backspace => {
                     if !result.is_empty() {
-                        result.truncate(result.len()-1);
+                        result.truncate(result.len() - 1);
                     }
-                },
+                }
                 Key::Char('\n') => break,
                 Key::Char(c) => {
                     if !c.is_control() {
                         result.push(c);
                     }
-                },
+                }
                 Key::Esc => {
                     result.truncate(0);
                     break;
                 }
                 _ => (),
             }
+
+            callback(self, key, &result);
         }
 
         self.status_message = StatusMessage::from(String::new());
@@ -227,7 +256,7 @@ impl Editor {
         );
         let len = status.len() + line_indicator.len();
         if width > len {
-            status.push_str(&" ".repeat(width-len));
+            status.push_str(&" ".repeat(width - len));
         }
         status = format!("{}{}", status, line_indicator);
 
@@ -288,7 +317,7 @@ impl Editor {
                         x = 0;
                     }
                 }
-            },
+            }
             Key::Right => {
                 if x < width {
                     x += 1;
@@ -303,14 +332,14 @@ impl Editor {
                 } else {
                     0
                 }
-            },
+            }
             Key::PageDown => {
                 y = if y.saturating_add(terminal_height) < height {
                     y + terminal_height as usize
                 } else {
                     height
                 }
-            },
+            }
             Key::Home => x = 0,
             Key::End => x = width,
             _ => (),
@@ -323,7 +352,7 @@ impl Editor {
 
         if x > width {
             x = width;
-        } 
+        }
 
         self.cursor_position = Position { x, y }
     }
@@ -340,7 +369,7 @@ impl Editor {
         let height = self.terminal.size().height;
         for terminal_row in 0..height {
             Terminal::clear_current_line();
-            if let Some(row) = self.document.row(terminal_row as usize+ self.offset.y) {
+            if let Some(row) = self.document.row(terminal_row as usize + self.offset.y) {
                 self.draw_row(row);
             } else if self.document.is_empty() && terminal_row == height / 3 {
                 self.draw_welcome_message();

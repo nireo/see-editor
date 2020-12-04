@@ -13,7 +13,11 @@ impl Row {
         let start = cmp::min(start, end);
 
         let mut result = String::new();
-        for grapheme in self.string[..].graphemes(true).skip(start).take(end-start) {
+        for grapheme in self.string[..]
+            .graphemes(true)
+            .skip(start)
+            .take(end - start)
+        {
             if grapheme == "\t" {
                 result.push_str(" ");
             } else {
@@ -93,6 +97,21 @@ impl Row {
             string: splitted_row,
             len: splitted_length,
         }
+    }
+
+    pub fn find(&self, query: &str) -> Option<usize> {
+        let matching_byte_index = self.string.find(query);
+        if let Some(matching_byte_index) = matching_byte_index {
+            for (grapeme_index, (byte_index, _)) in
+                self.string[..].grapheme_indices(true).enumerate()
+            {
+                if matching_byte_index == byte_index {
+                    return Some(grapeme_index);
+                }
+            }
+        }
+
+        None
     }
 
     pub fn as_bytes(&self) -> &[u8] {

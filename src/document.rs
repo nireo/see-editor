@@ -51,7 +51,7 @@ impl Document {
         }
     }
 
-     pub fn insert(&mut self, at: &Position, c: char) {
+    pub fn insert(&mut self, at: &Position, c: char) {
         if c == '\n' {
             self.insert_newline(at);
             return;
@@ -77,7 +77,7 @@ impl Document {
         let new_row = self.rows.get_mut(at.y).unwrap().split(at.x);
         self.rows.insert(at.y + 1, new_row);
     }
-    
+
     pub fn save(&self) -> Result<(), Error> {
         if let Some(file_name) = &self.file_name {
             let mut file = fs::File::create(file_name)?;
@@ -88,5 +88,15 @@ impl Document {
         }
 
         Ok(())
+    }
+
+    pub fn find(&self, query: &str) -> Option<Position> {
+        for (y, row) in self.rows.iter().enumerate() {
+            if let Some(x) = row.find(query) {
+                return Some(Position { x, y });
+            }
+        }
+
+        None
     }
 }
