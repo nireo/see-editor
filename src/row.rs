@@ -1,4 +1,5 @@
 use crate::highlighting;
+use crate::SearchDirection;
 use std::cmp;
 use termion::color;
 use unicode_segmentation::UnicodeSegmentation;
@@ -132,14 +133,40 @@ impl Row {
         }
     }
 
-    pub fn find(&self, query: &str) -> Option<usize> {
-        let matching_byte_index = self.string.find(query);
+    pub fn find(&self, query: &str, at: usize, direction: SearchDirection) -> Option<usize> {
+        if at > self.len {
+            return None;
+        }
+
+        let start = if direction == SearchDirection::Forward {
+            at
+        } else {
+            0
+        };
+
+        let end = if direction == SearchDirection::Forward {
+            self.len
+        } else {
+            at
+        };
+
+        let substring: String = self.string[..]
+            .graphemes(true)
+            .skip(start)
+            .take(end - start)
+            .collect();
+
+        let matching_byte_index = if direction == SearchDirection::Forward {
+            substring.find(query)
+        } else {
+            substring.rfind(query)
+        };
+
         if let Some(matching_byte_index) = matching_byte_index {
-            for (grapeme_index, (byte_index, _)) in
-                self.string[..].grapheme_indices(true).enumerate()
+            for (grapeme_index, (byte_index, _)) in substring[..].grapheme_indices(true).enumerate()
             {
                 if matching_byte_index == byte_index {
-                    return Some(grapeme_index);
+                    return Some(grapeme_index + start);
                 }
             }
         }
