@@ -113,6 +113,117 @@ impl FileType {
             };
         }
 
+        if file_name.ends_with(".py") {
+            return Self {
+                name: String::from("python3"),
+                highlight_opts: HighlightOptions {
+                    numbers: true,
+                    strings: true,
+                    characters: true,
+                    comments: true,
+                    primary_keywords: vec![
+                        "class".to_string(),
+                        "def".to_string(),
+                        "else".to_string(),
+                        "for".to_string(),
+                        "if".to_string(),
+                        "global".to_string(),
+                        "while".to_string(),
+                        "return".to_string(),
+                        "pass".to_string(),
+                        "import".to_string(),
+                        "try".to_string(),
+                        "except".to_string(),
+                        "finally".to_string(),
+                        "async".to_string(),
+                        "await".to_string(),
+                        "elif".to_string(),
+                        "raise".to_string(),
+                        "with".to_string(),
+                    ],
+                    secondary_keywords: vec![
+                        "True".to_string(),
+                        "False".to_string(),
+                        "None".to_string(),
+                        "and".to_string(),
+                        "as".to_string(),
+                        "assert".to_string(),
+                        "break".to_string(),
+                        "continue".to_string(),
+                        "del".to_string(),
+                        "from".to_string(),
+                        "in".to_string(),
+                        "is".to_string(),
+                        "lambda".to_string(),
+                        "nonlocal".to_string(),
+                        "not".to_string(),
+                        "or".to_string(),
+                        "yield".to_string(),
+                    ],
+                },
+            };
+        }
+
+        if file_name.ends_with(".go") {
+            return Self {
+                name: String::from("golang"),
+                highlight_opts: HighlightOptions {
+                    numbers: true,
+                    strings: true,
+                    characters: true,
+                    comments: true,
+                    primary_keywords: vec![
+                        "break".to_string(),
+                        "default".to_string(),
+                        "func".to_string(),
+                        "interface".to_string(),
+                        "select".to_string(),
+                        "case".to_string(),
+                        "defer".to_string(),
+                        "go".to_string(),
+                        "map".to_string(),
+                        "struct".to_string(),
+                        "chan".to_string(),
+                        "else".to_string(),
+                        "goto".to_string(),
+                        "package".to_string(),
+                        "switch".to_string(),
+                        "const".to_string(),
+                        "fallthrough".to_string(),
+                        "if".to_string(),
+                        "range".to_string(),
+                        "type".to_string(),
+                        "continue".to_string(),
+                        "for".to_string(),
+                        "import".to_string(),
+                        "return".to_string(),
+                        "var".to_string(),
+                    ],
+                    secondary_keywords: vec![
+                        "bool".to_string(),
+                        "string".to_string(),
+                        "int".to_string(),
+                        "int8".to_string(),
+                        "int16".to_string(),
+                        "int32".to_string(),
+                        "int64".to_string(),
+                        "uint".to_string(),
+                        "uint8".to_string(),
+                        "uint16".to_string(),
+                        "uint32".to_string(),
+                        "uint64".to_string(),
+                        "uintptr".to_string(),
+                        "byte".to_string(),
+                        "rune".to_string(),
+                        "float32".to_string(),
+                        "float64".to_string(),
+                        "complex64".to_string(),
+                        "complex128".to_string(),
+                    ],
+                },
+            };
+        }
+
         Self::default()
     }
 }

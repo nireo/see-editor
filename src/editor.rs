@@ -218,7 +218,7 @@ impl Editor {
 
     pub fn default() -> Self {
         let args: Vec<String> = env::args().collect();
-        let mut initial_status = String::from("ctrl-q quit | ctrl-s save | ctrl-f");
+        let mut initial_status = String::from("ctrl-q quit | ctrl-s save | ctrl-f search");
         let document = if args.len() > 1 {
             let file_name = &args[1];
             let doc = Document::open(&file_name);
@@ -263,7 +263,7 @@ impl Editor {
     fn draw_status_bar(&self) {
         let mut status;
         let width = self.terminal.size().width as usize;
-        let mut file_name = "[no name]}".to_string();
+        let mut file_name = "[no name]".to_string();
         if let Some(name) = &self.document.file_name {
             file_name = name.clone();
             file_name.truncate(20);
@@ -272,7 +272,7 @@ impl Editor {
         status = format!("{}", file_name);
 
         let line_indicator = format!(
-            "{}/{} [{}]",
+            "[{}/{}] [{}]",
             self.cursor_position.y.saturating_add(1),
             self.document.len(),
             self.document.file_type(),
