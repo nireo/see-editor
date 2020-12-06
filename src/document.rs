@@ -1,3 +1,4 @@
+use crate::FileType;
 use crate::Position;
 use crate::Row;
 use crate::SearchDirection;
@@ -8,6 +9,7 @@ use std::io::{Error, Write};
 pub struct Document {
     rows: Vec<Row>,
     pub file_name: Option<String>,
+    file_type: FileType,
 }
 
 impl Document {
@@ -23,6 +25,7 @@ impl Document {
         Ok(Self {
             rows,
             file_name: Some(filename.to_string()),
+            file_type: FileType::from(filename),
         })
     }
 
@@ -36,6 +39,10 @@ impl Document {
 
     pub fn len(&self) -> usize {
         self.rows.len()
+    }
+
+    pub fn file_type(&self) -> String {
+        self.file_type.name()
     }
 
     pub fn delete(&mut self, at: &Position) {
@@ -96,6 +103,7 @@ impl Document {
                 file.write_all(row.as_bytes())?;
                 file.write_all(b"\n")?;
             }
+            self.file_type = FileType::from(file_name);
         }
 
         Ok(())
