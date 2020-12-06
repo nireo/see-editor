@@ -1,4 +1,5 @@
 use crate::highlighting;
+use crate::HighlightOptions;
 use crate::SearchDirection;
 use std::cmp;
 use termion::color;
@@ -55,7 +56,7 @@ impl Row {
         self.len == 0
     }
 
-    pub fn highlight(&mut self, word: Option<&str>) {
+    pub fn highlight(&mut self, opts: HighlightOptions, word: Option<&str>) {
         let mut highlighting = Vec::new();
         let chars: Vec<char> = self.string.chars().collect();
         let mut matches = Vec::new();
@@ -94,11 +95,15 @@ impl Row {
                 &highlighting::Type::None
             };
 
-            if (c.is_ascii_digit()
-                && (prev_is_separator || previous_highlight == &highlighting::Type::Number))
-                || (c == &'.' && previous_highlight == &highlighting::Type::Number)
-            {
-                highlighting.push(highlighting::Type::Number);
+            if opts.numbers() {
+                if (c.is_ascii_digit()
+                    && (prev_is_separator || previous_highlight == &highlighting::Type::Number))
+                    || (c == &'.' && previous_highlight == &highlighting::Type::Number)
+                {
+                    highlighting.push(highlighting::Type::Number);
+                } else {
+                    highlighting.push(highlighting::Type::None);
+                }
             } else {
                 highlighting.push(highlighting::Type::None);
             }
