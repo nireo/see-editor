@@ -147,7 +147,7 @@ impl Document {
 
     pub fn highlight(&mut self, word: Option<&str>) {
         for row in &mut self.rows {
-            row.highlight(word);
+            row.highlight(self.file_type.highlight_options(), word);
         }
     }
 }
