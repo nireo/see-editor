@@ -9,7 +9,7 @@ use termion::color;
 use termion::event::Key;
 use termion::raw::IntoRawMode;
 
-const STATUS_BG_COLOR: color::Rgb = color::Rgb(239, 239, 239);
+const STATUS_BG_COLOR: color::Rgb = color::Rgb(255, 255, 255);
 const STATUS_FG_COLOR: color::Rgb = color::Rgb(63, 63, 63);
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -218,7 +218,7 @@ impl Editor {
 
     pub fn default() -> Self {
         let args: Vec<String> = env::args().collect();
-        let mut initial_status = String::from("Ctrl-Q quit | Crtl-S save");
+        let mut initial_status = String::from("ctrl-q quit | ctrl-s save | ctrl-f");
         let document = if args.len() > 1 {
             let file_name = &args[1];
             let doc = Document::open(&file_name);
@@ -268,13 +268,14 @@ impl Editor {
             file_name = name.clone();
             file_name.truncate(20);
         }
-        status = format!("{} - {} lines", file_name, self.document.len());
+
+        status = format!("{}", file_name);
 
         let line_indicator = format!(
             "{}/{} [{}]",
-            self.document.file_type(),
             self.cursor_position.y.saturating_add(1),
-            self.document.len()
+            self.document.len(),
+            self.document.file_type(),
         );
         let len = status.len() + line_indicator.len();
         if width > len {
