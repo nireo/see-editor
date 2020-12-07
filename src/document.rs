@@ -10,6 +10,7 @@ pub struct Document {
     rows: Vec<Row>,
     pub file_name: Option<String>,
     file_type: FileType,
+    edited: bool,
 }
 
 impl Document {
@@ -27,6 +28,7 @@ impl Document {
             rows,
             file_name: Some(filename.to_string()),
             file_type,
+            edited: false,
         })
     }
 
@@ -65,6 +67,11 @@ impl Document {
     }
 
     pub fn insert(&mut self, at: &Position, c: char) {
+        if at.y > self.rows.len() {
+            return;
+        }
+
+        self.edited = true;
         if c == '\n' {
             self.insert_newline(at);
             return;
@@ -106,6 +113,8 @@ impl Document {
                 file.write_all(b"\n")?;
                 row.highlight(&self.file_type.highlight_options(), None);
             }
+
+            self.edited = false;
         }
 
         Ok(())
@@ -149,5 +158,9 @@ impl Document {
         for row in &mut self.rows {
             row.highlight(&self.file_type.highlight_options(), word);
         }
+    }
+
+    pub fn is_edited(&self) -> bool {
+        self.edited
     }
 }

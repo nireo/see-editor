@@ -295,6 +295,12 @@ impl Editor {
     fn draw_status_bar(&self) {
         let mut status;
         let width = self.terminal.size().width as usize;
+        let mod_indicator = if self.document.is_edited() {
+            " (edited)"
+        } else {
+            ""
+        };
+
         let mut file_name = "[no name]".to_string();
         if let Some(name) = &self.document.file_name {
             file_name = name.clone();
@@ -307,7 +313,7 @@ impl Editor {
             "insert".to_string()
         };
 
-        status = format!("{} | {}", editor_mode, file_name);
+        status = format!("{} | {}{}", editor_mode, file_name, mod_indicator);
 
         let line_indicator = format!(
             "[{}/{}] [{}]",
