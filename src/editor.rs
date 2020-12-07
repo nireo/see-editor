@@ -40,6 +40,12 @@ impl StatusMessage {
     }
 }
 
+#[derive(PartialEq)]
+enum EditorMode {
+    Insert,
+    View,
+}
+
 pub struct Editor {
     quit: bool,
     terminal: Terminal,
@@ -47,6 +53,7 @@ pub struct Editor {
     offset: Position,
     document: Document,
     status_message: StatusMessage,
+    editor_mode: EditorMode,
 }
 
 impl Editor {
@@ -66,6 +73,10 @@ impl Editor {
                 end(error);
             }
         }
+    }
+
+    fn change_mode(&mut self, to_change: EditorMode) {
+        self.editor_mode = to_change;
     }
 
     fn handle_file_save(&mut self) {
@@ -124,31 +135,51 @@ impl Editor {
 
     fn process_press(&mut self) -> Result<(), std::io::Error> {
         let pressed_key = Terminal::read_key()?;
-        match pressed_key {
-            Key::Ctrl('q') => self.quit = true,
-            Key::Ctrl('s') => self.handle_file_save(),
-            Key::Ctrl('f') => self.search(),
-            Key::Char(c) => {
-                self.document.insert(&self.cursor_position, c);
-                self.move_cursor(Key::Right);
+
+        // There are different keybindings depending on which mode you're in, so check which
+        // keybindings to use.
+        if self.editor_mode == EditorMode::View {
+            // EditorMode::View is similar to vim's normal mode
+            match pressed_key {
+                Key::Char('i') => self.change_mode(EditorMode::Insert),
+                Key::Char('j') => self.move_cursor(Key::Down),
+                Key::Char('h') => self.move_cursor(Key::Left),
+                Key::Char('k') => self.move_cursor(Key::Up),
+                Key::Char('l') => self.move_cursor(Key::Right),
+                Key::Ctrl('q') => self.quit = true,
+                Key::Ctrl('s') => self.handle_file_save(),
+                Key::Ctrl('f') => self.search(),
+                _ => (),
             }
-            Key::Delete => self.document.delete(&self.cursor_position),
-            Key::Backspace => {
-                if self.cursor_position.x > 0 || self.cursor_position.y > 0 {
-                    self.move_cursor(Key::Left);
-                    self.document.delete(&self.cursor_position);
+        } else if self.editor_mode == EditorMode::Insert {
+            match pressed_key {
+                Key::Ctrl('q') => self.quit = true,
+                Key::Ctrl('s') => self.handle_file_save(),
+                Key::Ctrl('f') => self.search(),
+                Key::Char(c) => {
+                    self.document.insert(&self.cursor_position, c);
+                    self.move_cursor(Key::Right);
                 }
+                Key::Delete => self.document.delete(&self.cursor_position),
+                Key::Backspace => {
+                    if self.cursor_position.x > 0 || self.cursor_position.y > 0 {
+                        self.move_cursor(Key::Left);
+                        self.document.delete(&self.cursor_position);
+                    }
+                }
+                Key::Esc => self.change_mode(EditorMode::View),
+                Key::Up
+                | Key::Down
+                | Key::Left
+                | Key::Right
+                | Key::PageUp
+                | Key::PageDown
+                | Key::End
+                | Key::Home => self.move_cursor(pressed_key),
+                _ => (),
             }
-            Key::Up
-            | Key::Down
-            | Key::Left
-            | Key::Right
-            | Key::PageUp
-            | Key::PageDown
-            | Key::End
-            | Key::Home => self.move_cursor(pressed_key),
-            _ => (),
         }
+
         self.scroll();
         Ok(())
     }
@@ -239,6 +270,7 @@ impl Editor {
             document: document,
             offset: Position::default(),
             status_message: StatusMessage::from(initial_status),
+            editor_mode: EditorMode::View,
         }
     }
 
@@ -269,7 +301,13 @@ impl Editor {
             file_name.truncate(20);
         }
 
-        status = format!("{}", file_name);
+        let editor_mode = if self.editor_mode == EditorMode::View {
+            "view".to_string()
+        } else {
+            "insert".to_string()
+        };
+
+        status = format!("{} | {}", editor_mode, file_name);
 
         let line_indicator = format!(
             "[{}/{}] [{}]",
