@@ -54,6 +54,8 @@ pub struct Editor {
     document: Document,
     status_message: StatusMessage,
     editor_mode: EditorMode,
+    documents: Vec<Document>,
+    open_document: usize,
 }
 
 impl Editor {
@@ -93,6 +95,30 @@ impl Editor {
             self.status_message = StatusMessage::from("file saved".to_string());
         } else {
             self.status_message = StatusMessage::from("error writing file".to_string());
+        }
+    }
+
+    // Check if the wants to exit without saving changes. If the user wants to exit without saving,
+    // signal a quit request, so that when refreshing the editor the session will end.
+    fn check_exit_without_saving(&mut self) {
+        // If not edited just don't do anything and quit the program
+        if !self.document.edited() {
+            self.quit = true;
+            return;
+        }
+
+        let action = self
+            .prompt("exit without saving? (yes/no)", |_, _, _| {})
+            .unwrap_or(None);
+
+        match action {
+            Some(action) => {
+                if action.to_string() == "yes" || action.to_string() == "y" {
+                    self.quit = true;
+                    return;
+                }
+            }
+            None => return,
         }
     }
 
@@ -146,14 +172,14 @@ impl Editor {
                 Key::Char('h') => self.move_cursor(Key::Left),
                 Key::Char('k') => self.move_cursor(Key::Up),
                 Key::Char('l') => self.move_cursor(Key::Right),
-                Key::Ctrl('q') => self.quit = true,
+                Key::Ctrl('q') => self.check_exit_without_saving(),
                 Key::Ctrl('s') => self.handle_file_save(),
                 Key::Ctrl('f') => self.search(),
                 _ => (),
             }
         } else if self.editor_mode == EditorMode::Insert {
             match pressed_key {
-                Key::Ctrl('q') => self.quit = true,
+                Key::Ctrl('q') => self.check_exit_without_saving(),
                 Key::Ctrl('s') => self.handle_file_save(),
                 Key::Ctrl('f') => self.search(),
                 Key::Char(c) => {
@@ -271,6 +297,8 @@ impl Editor {
             offset: Position::default(),
             status_message: StatusMessage::from(initial_status),
             editor_mode: EditorMode::View,
+            documents: Vec::new(),
+            open_document: 0,
         }
     }
 

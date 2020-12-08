@@ -36,6 +36,10 @@ impl Document {
         self.rows.get(index)
     }
 
+    pub fn edited(&self) -> bool {
+        self.edited
+    }
+
     pub fn is_empty(&self) -> bool {
         self.rows.is_empty()
     }
