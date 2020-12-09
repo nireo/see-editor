@@ -46,6 +46,12 @@ enum EditorMode {
     View,
 }
 
+#[derive(PartialEq)]
+enum FileMoveDirection {
+    Left,
+    Right,
+}
+
 pub struct Editor {
     quit: bool,
     terminal: Terminal,
@@ -55,7 +61,7 @@ pub struct Editor {
     status_message: StatusMessage,
     editor_mode: EditorMode,
     documents: Vec<Document>,
-    open_document: usize,
+    document_index: usize,
 }
 
 impl Editor {
@@ -175,7 +181,9 @@ impl Editor {
                 Key::Ctrl('q') => self.check_exit_without_saving(),
                 Key::Ctrl('s') => self.handle_file_save(),
                 Key::Ctrl('f') => self.search(),
-                Key::Ctrl('n') => self.open_new_file(),
+                Key::Ctrl('p') => self.open_new_file(),
+                Key::Left => self.move_in_documents(FileMoveDirection::Left),
+                Key::Right => self.move_in_documents(FileMoveDirection::Right),
                 _ => (),
             }
         } else if self.editor_mode == EditorMode::Insert {
@@ -291,6 +299,18 @@ impl Editor {
         self.documents.push(final_document);
     }
 
+    fn move_in_documents(&mut self, direction: FileMoveDirection) {
+        if direction == FileMoveDirection::Left && self.document_index > 0 {
+            self.document_index -= 1;
+        // self.document = self.documents[self.document_index];
+        } else if direction == FileMoveDirection::Right
+            && self.document_index < self.documents.len() - 1
+        {
+            self.document_index += 1;
+            // self.document = self.documents[self.document_index];
+        }
+    }
+
     pub fn default() -> Self {
         let args: Vec<String> = env::args().collect();
         let mut initial_status = String::from("ctrl-q quit | ctrl-s save | ctrl-f search");
@@ -316,7 +336,7 @@ impl Editor {
             status_message: StatusMessage::from(initial_status),
             editor_mode: EditorMode::View,
             documents: Vec::new(),
-            open_document: 0,
+            document_index: 0,
         }
     }
 
