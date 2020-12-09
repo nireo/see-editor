@@ -175,6 +175,7 @@ impl Editor {
                 Key::Ctrl('q') => self.check_exit_without_saving(),
                 Key::Ctrl('s') => self.handle_file_save(),
                 Key::Ctrl('f') => self.search(),
+                Key::Ctrl('n') => self.open_new_file(),
                 _ => (),
             }
         } else if self.editor_mode == EditorMode::Insert {
@@ -182,6 +183,7 @@ impl Editor {
                 Key::Ctrl('q') => self.check_exit_without_saving(),
                 Key::Ctrl('s') => self.handle_file_save(),
                 Key::Ctrl('f') => self.search(),
+                Key::Ctrl('n') => self.open_new_file(),
                 Key::Char(c) => {
                     self.document.insert(&self.cursor_position, c);
                     self.move_cursor(Key::Right);
@@ -273,6 +275,22 @@ impl Editor {
         Terminal::flush()
     }
 
+    // Open new file opens a document from a given filename, and then pushes that document into the
+    // editor's open_documents vector. If a file with the given filename was not found, open a
+    // unnamed document without content.
+    fn open_new_file(&mut self) {
+        let filename = self.prompt("new filepath: ", |_, _, _| {}).unwrap_or(None);
+        let mut final_document = Document::default();
+        if filename.is_some() {
+            let new_document = Document::open(&filename.unwrap());
+            if new_document.is_ok() {
+                final_document = new_document.unwrap();
+            }
+        }
+
+        self.documents.push(final_document);
+    }
+
     pub fn default() -> Self {
         let args: Vec<String> = env::args().collect();
         let mut initial_status = String::from("ctrl-q quit | ctrl-s save | ctrl-f search");
@@ -320,6 +338,8 @@ impl Editor {
         }
     }
 
+    // Draw the informative status bar which displays, some helpful commands, and the open
+    // documents.
     fn draw_status_bar(&self) {
         let mut status;
         let width = self.terminal.size().width as usize;
@@ -328,6 +348,14 @@ impl Editor {
         } else {
             ""
         };
+
+        let mut open_document_display = String::new();
+        for document in &self.documents {
+            match &document.file_name {
+                Some(file_name) => open_document_display += &file_name.to_string(),
+                None => (),
+            }
+        }
 
         let mut file_name = "[no name]".to_string();
         if let Some(name) = &self.document.file_name {
@@ -341,7 +369,10 @@ impl Editor {
             "insert".to_string()
         };
 
-        status = format!("{} | {}{}", editor_mode, file_name, mod_indicator);
+        status = format!(
+            "{} | {}{} | open: {}",
+            editor_mode, file_name, mod_indicator, open_document_display
+        );
 
         let line_indicator = format!(
             "[{}/{}] [{}]",
