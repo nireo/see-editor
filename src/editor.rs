@@ -114,7 +114,7 @@ impl Editor {
         }
 
         let action = self
-            .prompt("exit without saving? (yes/no)", |_, _, _| {})
+            .prompt("exit without saving? (y/n)", |_, _, _| {})
             .unwrap_or(None);
 
         match action {
@@ -125,6 +125,50 @@ impl Editor {
                 }
             }
             None => return,
+        }
+    }
+
+    // Check if the user wants to close the current document without saving.
+    fn exit_document_without_save(&mut self, index: usize) -> bool {
+        if index > self.documents.len() - 1 {
+            // Return false, since in other functions this leads to doing nothing
+            return false;
+        }
+
+        let action = self
+            .prompt("exit current document without saving (y/n))", |_, _, _| {})
+            .unwrap_or(None);
+
+        match action {
+            Some(action) => {
+                if action.to_string() == "yes" || action.to_string() == "y" {
+                    return true;
+                }
+            }
+            None => return false,
+        }
+
+        false
+    }
+
+    // Close current file closes the document window for a certain file. also does checking if that
+    // file is changed.
+    fn close_current_file(&mut self) {
+        // If the documents length is zero, this action is the same as closing the editor.
+        if self.documents.len() == 1 {
+            self.check_exit_without_saving();
+            return;
+        }
+
+        if self.document_index == 0 {
+            if self.exit_document_without_save(self.document_index) {
+                self.documents.remove(self.document_index);
+            }
+        } else {
+            if self.exit_document_without_save(self.document_index) {
+                self.document_index -= 1;
+                self.documents.remove(self.document_index);
+            }
         }
     }
 
@@ -191,6 +235,7 @@ impl Editor {
                 Key::Char('l') => self.move_cursor(Key::Right),
                 Key::Ctrl('q') => self.check_exit_without_saving(),
                 Key::Ctrl('s') => self.handle_file_save(),
+                Key::Ctrl('z') => self.close_current_file(),
                 Key::Ctrl('f') => self.search(),
                 Key::Ctrl('p') => self.open_new_file(),
                 Key::Ctrl('e') => self.move_cursor(Key::End),
