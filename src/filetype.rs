@@ -1,5 +1,3 @@
-use std::clone;
-
 pub struct FileType {
     name: String,
     highlight_opts: HighlightOptions,
@@ -227,12 +225,6 @@ impl FileType {
         }
 
         Self::default()
-    }
-}
-
-impl Clone for FileType {
-    fn clone(&self) -> Self {
-        *self
     }
 }
 

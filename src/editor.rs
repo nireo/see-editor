@@ -9,9 +9,6 @@ use termion::color;
 use termion::event::Key;
 use termion::raw::IntoRawMode;
 
-const STATUS_BG_COLOR: color::Rgb = color::Rgb(255, 255, 255);
-const STATUS_FG_COLOR: color::Rgb = color::Rgb(63, 63, 63);
-
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 
 #[derive(PartialEq, Copy, Clone)]
@@ -83,10 +80,13 @@ impl Editor {
         }
     }
 
+    // Change the editor move to which ever mode in the EditorMode enum.
     fn change_mode(&mut self, to_change: EditorMode) {
         self.editor_mode = to_change;
     }
 
+    // Save the current document. If a the user is editing a unnamed document, this function will
+    // prompt them to name that file to save it.
     fn handle_file_save(&mut self) {
         if self.document.file_name.is_none() {
             let new_name = self.prompt("save as: ", |_, _, _| {}).unwrap_or(None);
@@ -97,6 +97,7 @@ impl Editor {
             self.document.file_name = new_name;
         }
 
+        // Prompt the user with a message describing the execution of the operation.
         if self.document.save().is_ok() {
             self.status_message = StatusMessage::from("file saved".to_string());
         } else {
@@ -128,21 +129,29 @@ impl Editor {
         }
     }
 
+    // Search for a word in the current document. The user can move in the order from left-to-right
+    // and vice versa. The user will type the search term in the prompt field and highlight all the
+    // matching words.
     fn search(&mut self) {
         let old_position = self.cursor_position.clone();
         let mut direction = SearchDirection::Forward;
+
+        // Get the query word.
         let query = self
             .prompt("search: ", |editor, key, query| {
                 let mut moved = false;
                 match key {
+                    // Move from right-to-left
                     Key::Right | Key::Down => {
                         direction = SearchDirection::Forward;
                         editor.move_cursor(Key::Right);
                         moved = true;
                     }
+                    // Move from left-to-right
                     Key::Left | Key::Up => direction = SearchDirection::Backward,
                     _ => direction = SearchDirection::Forward,
                 }
+                // If a position is found move the cursor to that position.
                 if let Some(position) =
                     editor
                         .document
@@ -153,6 +162,8 @@ impl Editor {
                 } else if moved {
                     editor.move_cursor(Key::Left);
                 }
+
+                // Highlight the position in which the word is.
                 editor.document.highlight(Some(query));
             })
             .unwrap_or(None);
@@ -165,6 +176,7 @@ impl Editor {
         self.document.highlight(None);
     }
 
+    // Handle all the keypresses the user types as input.
     fn process_press(&mut self) -> Result<(), std::io::Error> {
         let pressed_key = Terminal::read_key()?;
 
@@ -182,28 +194,37 @@ impl Editor {
                 Key::Ctrl('s') => self.handle_file_save(),
                 Key::Ctrl('f') => self.search(),
                 Key::Ctrl('p') => self.open_new_file(),
+                Key::Ctrl('e') => self.move_cursor(Key::End),
+                Key::Ctrl('h') => self.move_cursor(Key::Home),
                 Key::Left => self.move_in_documents(FileMoveDirection::Left),
                 Key::Right => self.move_in_documents(FileMoveDirection::Right),
                 _ => (),
             }
         } else if self.editor_mode == EditorMode::Insert {
+            // Handle the keypresses in the insert mode, in which the user can edit the document.
             match pressed_key {
                 Key::Ctrl('q') => self.check_exit_without_saving(),
                 Key::Ctrl('s') => self.handle_file_save(),
                 Key::Ctrl('f') => self.search(),
                 Key::Ctrl('n') => self.open_new_file(),
                 Key::Char(c) => {
+                    // Insert the wanted character at the position of the cursor. Also move the
+                    // cursor so it seems more interactive.
                     self.document.insert(&self.cursor_position, c);
                     self.move_cursor(Key::Right);
                 }
                 Key::Delete => self.document.delete(&self.cursor_position),
                 Key::Backspace => {
+                    // Check that we don't use negative indices.
                     if self.cursor_position.x > 0 || self.cursor_position.y > 0 {
+                        // Move the cursor back and remove the character at the cursor position.
                         self.move_cursor(Key::Left);
                         self.document.delete(&self.cursor_position);
                     }
                 }
+                // Go into 'view' mode.
                 Key::Esc => self.change_mode(EditorMode::View),
+                // Explanations for each keybinding found in the `move_cursor` function.
                 Key::Up
                 | Key::Down
                 | Key::Left
@@ -220,6 +241,9 @@ impl Editor {
         Ok(())
     }
 
+    // Prompt the user to type a variable at the bottom of the editor. Also take in a mutable
+    // callback function since it helps with making the search feature a lot cleaner, since we want
+    // to move the cursor when searching through words.
     fn prompt<C>(&mut self, prompt: &str, mut callback: C) -> Result<Option<String>, std::io::Error>
     where
         C: FnMut(&mut Self, Key, &String),
@@ -231,17 +255,21 @@ impl Editor {
 
             let key = Terminal::read_key()?;
             match key {
+                // Remove one character from the prompt result.
                 Key::Backspace => {
                     if !result.is_empty() {
                         result.truncate(result.len() - 1);
                     }
                 }
+                // Since the key is enter, we can stop executing and process the result.
                 Key::Char('\n') => break,
+                // Add a given key to the result prompt.
                 Key::Char(c) => {
                     if !c.is_control() {
                         result.push(c);
                     }
                 }
+                // Stop typing and don't submit, this just makes the lenght of the result 0.
                 Key::Esc => {
                     result.truncate(0);
                     break;
@@ -249,9 +277,11 @@ impl Editor {
                 _ => (),
             }
 
+            // Pass the result to callback, only used for searching words.
             callback(self, key, &result);
         }
 
+        // Clear the prompt from the screen.
         self.status_message = StatusMessage::from(String::new());
         if result.is_empty() {
             return Ok(None);
@@ -260,25 +290,32 @@ impl Editor {
         Ok(Some(result))
     }
 
+    // Refreshes the editor and checks for a quit signal. If a quit signal is found, stop the
+    // execution and else draw all the information on the terminal and flush the screen.
     fn refresh_editor(&self) -> Result<(), std::io::Error> {
+        // Hide and reset the cursor position and clear the screen.
         Terminal::cursor_hide();
         Terminal::clear_screen();
         Terminal::cursor_position(&Position::default());
 
+        // Check for quit signal
         if self.quit {
             Terminal::clear_screen();
             println!("see you later. \r")
         } else {
+            // Draw the rows, status bar and the message bar.
             self.draw_tildes();
             self.draw_status_bar();
             self.draw_message_bar();
 
+            // Update the terminal cursor position
             Terminal::cursor_position(&Position {
                 x: self.cursor_position.x.saturating_sub(self.offset.x),
                 y: self.cursor_position.y.saturating_sub(self.offset.y),
             });
         }
 
+        // Show the cursor and flush the screen.
         Terminal::cursor_show();
         Terminal::flush()
     }
@@ -289,7 +326,11 @@ impl Editor {
     fn open_new_file(&mut self) {
         let filename = self.prompt("new filepath: ", |_, _, _| {}).unwrap_or(None);
         let mut final_document = Document::default();
+
+        // Check that the filename is not invalid
         if filename.is_some() {
+            // Check if we can open a new document using the filename, if not use a default new
+            // document.
             let new_document = Document::open(&filename.unwrap());
             if new_document.is_ok() {
                 final_document = new_document.unwrap();
@@ -299,6 +340,7 @@ impl Editor {
         self.documents.push(final_document);
     }
 
+    // Move in the list of files by the document index.
     fn move_in_documents(&mut self, direction: FileMoveDirection) {
         if direction == FileMoveDirection::Left && self.document_index > 0 {
             self.document_index -= 1;
@@ -311,16 +353,20 @@ impl Editor {
         }
     }
 
+    // Create a default instance of an editor.
     pub fn default() -> Self {
+        // Take a filename as an argument to the program.
         let args: Vec<String> = env::args().collect();
         let mut initial_status = String::from("ctrl-q quit | ctrl-s save | ctrl-f search");
         let document = if args.len() > 1 {
+            // If the filename is valid open that file in the editor, otherwise open an empty file
+            // in the editor.
             let file_name = &args[1];
             let doc = Document::open(&file_name);
             if doc.is_ok() {
                 doc.unwrap()
             } else {
-                initial_status = format!("error: could not open file '{}'", file_name);
+                initial_status = format!("could not open file '{}'", file_name);
                 Document::default()
             }
         } else {
@@ -340,6 +386,7 @@ impl Editor {
         }
     }
 
+    // Handle the mouse scroll.
     pub fn scroll(&mut self) {
         let Position { x, y } = self.cursor_position;
         let width = self.terminal.size().width as usize;
@@ -363,12 +410,15 @@ impl Editor {
     fn draw_status_bar(&self) {
         let mut status;
         let width = self.terminal.size().width as usize;
+
+        // Display a edited message, if the current document is edited without saving.
         let mod_indicator = if self.document.is_edited() {
             " (edited)"
         } else {
             ""
         };
 
+        // Display all the open files in the editor.
         let mut open_document_display = String::new();
         for document in &self.documents {
             match &document.file_name {
@@ -377,23 +427,25 @@ impl Editor {
             }
         }
 
+        // Display the current opened file.
         let mut file_name = "[no name]".to_string();
         if let Some(name) = &self.document.file_name {
             file_name = name.clone();
             file_name.truncate(20);
         }
 
+        // Display the editor mode
         let editor_mode = if self.editor_mode == EditorMode::View {
             "view".to_string()
         } else {
             "insert".to_string()
         };
-
         status = format!(
             "{} | {}{} | open: {}",
             editor_mode, file_name, mod_indicator, open_document_display
         );
 
+        // Indicate the current line, max lines and the detected filetype.
         let line_indicator = format!(
             "[{}/{}] [{}]",
             self.cursor_position.y.saturating_add(1),
@@ -406,14 +458,16 @@ impl Editor {
         }
         status = format!("{}{}", status, line_indicator);
 
+        // Shorten the statuc to fit the screen and also set the colors.
         status.truncate(width);
-        Terminal::set_bg_color(STATUS_BG_COLOR);
-        Terminal::set_fg_color(STATUS_FG_COLOR);
+        Terminal::set_bg_color(color::Rgb(255, 255, 255));
+        Terminal::set_fg_color(color::Rgb(63, 63, 63));
         println!("{}\r", status);
         Terminal::reset_bg_color();
         Terminal::reset_fg_color();
     }
 
+    // Draw the message bar.
     fn draw_message_bar(&self) {
         Terminal::clear_current_line();
         let message = &self.status_message;
@@ -424,12 +478,14 @@ impl Editor {
         }
     }
 
+    // Draw a welcome message in the middle of the screen.
     fn draw_welcome_message(&self) {
-        let mut welcome_message = format!("x editor -- version {}", VERSION);
+        let mut welcome_message = format!("see -- version {}", VERSION);
         let width = self.terminal.size().width as usize;
         let len = welcome_message.len();
         let padding = width.saturating_sub(len) / 2;
         let spaces = " ".repeat(padding.saturating_sub(1));
+
         welcome_message = format!("~{}{}", spaces, welcome_message);
         welcome_message.truncate(width);
         println!("{}\r", welcome_message);
@@ -446,12 +502,17 @@ impl Editor {
         };
 
         match key {
+            // Move cursor up
             Key::Up => y = y.saturating_sub(1),
+
+            // Move cursor down
             Key::Down => {
                 if y < height {
                     y = y.saturating_add(1);
                 }
             }
+
+            // Move cursor left
             Key::Left => {
                 if x > 0 {
                     x -= 1;
@@ -464,6 +525,8 @@ impl Editor {
                     }
                 }
             }
+
+            // Move cursor right
             Key::Right => {
                 if x < width {
                     x += 1;
@@ -472,6 +535,8 @@ impl Editor {
                     x = 0;
                 }
             }
+
+            // Move the cursor by the height of the terminal
             Key::PageUp => {
                 y = if y > terminal_height {
                     y - terminal_height
@@ -479,6 +544,8 @@ impl Editor {
                     0
                 }
             }
+
+            // Move the cursor down by the height of the terminal
             Key::PageDown => {
                 y = if y.saturating_add(terminal_height) < height {
                     y + terminal_height as usize
@@ -487,6 +554,8 @@ impl Editor {
                 }
             }
             Key::Home => x = 0,
+
+            // Home the cursor till the end of the road
             Key::End => x = width,
             _ => (),
         }
@@ -503,14 +572,17 @@ impl Editor {
         self.cursor_position = Position { x, y }
     }
 
+    // Draw a single row to the terminal screen.
     pub fn draw_row(&self, row: &Row) {
         let width = self.terminal.size().width as usize;
         let start = self.offset.x;
         let end = self.offset.x + width;
         let row = row.render(start, end);
+
         println!("{}\r", row)
     }
 
+    // Draw all the rows in a document.
     fn draw_tildes(&self) {
         let height = self.terminal.size().height;
         for terminal_row in 0..height {
@@ -526,6 +598,7 @@ impl Editor {
     }
 }
 
+// End the execution of the screen.
 fn end(e: std::io::Error) {
     Terminal::clear_screen();
     panic!(e);
