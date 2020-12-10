@@ -54,7 +54,6 @@ pub struct Editor {
     terminal: Terminal,
     cursor_position: Position,
     offset: Position,
-    document: Document,
     status_message: StatusMessage,
     editor_mode: EditorMode,
     documents: Vec<Document>,
@@ -88,17 +87,17 @@ impl Editor {
     // Save the current document. If a the user is editing a unnamed document, this function will
     // prompt them to name that file to save it.
     fn handle_file_save(&mut self) {
-        if self.document.file_name.is_none() {
+        if self.documents[self.document_index].file_name.is_none() {
             let new_name = self.prompt("save as: ", |_, _, _| {}).unwrap_or(None);
             if new_name.is_none() {
                 self.status_message = StatusMessage::from("save stopped".to_string());
                 return;
             }
-            self.document.file_name = new_name;
+            self.documents[self.document_index].file_name = new_name;
         }
 
         // Prompt the user with a message describing the execution of the operation.
-        if self.document.save().is_ok() {
+        if self.documents[self.document_index].save().is_ok() {
             self.status_message = StatusMessage::from("file saved".to_string());
         } else {
             self.status_message = StatusMessage::from("error writing file".to_string());
@@ -109,7 +108,7 @@ impl Editor {
     // signal a quit request, so that when refreshing the editor the session will end.
     fn check_exit_without_saving(&mut self) {
         // If not edited just don't do anything and quit the program
-        if !self.document.edited() {
+        if !self.documents[self.document_index].edited() {
             self.quit = true;
             return;
         }
@@ -152,11 +151,11 @@ impl Editor {
                     _ => direction = SearchDirection::Forward,
                 }
                 // If a position is found move the cursor to that position.
-                if let Some(position) =
-                    editor
-                        .document
-                        .find(&query, &editor.cursor_position, direction)
-                {
+                if let Some(position) = editor.documents[editor.document_index].find(
+                    &query,
+                    &editor.cursor_position,
+                    direction,
+                ) {
                     editor.cursor_position = position;
                     editor.scroll();
                 } else if moved {
@@ -164,7 +163,7 @@ impl Editor {
                 }
 
                 // Highlight the position in which the word is.
-                editor.document.highlight(Some(query));
+                editor.documents[editor.document_index].highlight(Some(query));
             })
             .unwrap_or(None);
 
@@ -173,7 +172,7 @@ impl Editor {
             self.scroll();
         }
 
-        self.document.highlight(None);
+        self.documents[self.document_index].highlight(None);
     }
 
     // Handle all the keypresses the user types as input.
@@ -210,16 +209,16 @@ impl Editor {
                 Key::Char(c) => {
                     // Insert the wanted character at the position of the cursor. Also move the
                     // cursor so it seems more interactive.
-                    self.document.insert(&self.cursor_position, c);
+                    self.documents[self.document_index].insert(&self.cursor_position, c);
                     self.move_cursor(Key::Right);
                 }
-                Key::Delete => self.document.delete(&self.cursor_position),
+                Key::Delete => self.documents[self.document_index].delete(&self.cursor_position),
                 Key::Backspace => {
                     // Check that we don't use negative indices.
                     if self.cursor_position.x > 0 || self.cursor_position.y > 0 {
                         // Move the cursor back and remove the character at the cursor position.
                         self.move_cursor(Key::Left);
-                        self.document.delete(&self.cursor_position);
+                        self.documents[self.document_index].delete(&self.cursor_position);
                     }
                 }
                 // Go into 'view' mode.
@@ -344,12 +343,10 @@ impl Editor {
     fn move_in_documents(&mut self, direction: FileMoveDirection) {
         if direction == FileMoveDirection::Left && self.document_index > 0 {
             self.document_index -= 1;
-        // self.document = self.documents[self.document_index];
         } else if direction == FileMoveDirection::Right
             && self.document_index < self.documents.len() - 1
         {
             self.document_index += 1;
-            // self.document = self.documents[self.document_index];
         }
     }
 
@@ -377,11 +374,10 @@ impl Editor {
             quit: false,
             terminal: Terminal::default().expect("failed to initialize terminal"),
             cursor_position: Position::default(),
-            document: document,
             offset: Position::default(),
             status_message: StatusMessage::from(initial_status),
             editor_mode: EditorMode::View,
-            documents: Vec::new(),
+            documents: vec![document],
             document_index: 0,
         }
     }
@@ -412,7 +408,7 @@ impl Editor {
         let width = self.terminal.size().width as usize;
 
         // Display a edited message, if the current document is edited without saving.
-        let mod_indicator = if self.document.is_edited() {
+        let mod_indicator = if self.documents[self.document_index].is_edited() {
             " (edited)"
         } else {
             ""
@@ -429,7 +425,7 @@ impl Editor {
 
         // Display the current opened file.
         let mut file_name = "[no name]".to_string();
-        if let Some(name) = &self.document.file_name {
+        if let Some(name) = &self.documents[self.document_index].file_name {
             file_name = name.clone();
             file_name.truncate(20);
         }
@@ -449,8 +445,8 @@ impl Editor {
         let line_indicator = format!(
             "[{}/{}] [{}]",
             self.cursor_position.y.saturating_add(1),
-            self.document.len(),
-            self.document.file_type(),
+            self.documents[self.document_index].len(),
+            self.documents[self.document_index].file_type(),
         );
         let len = status.len() + line_indicator.len();
         if width > len {
@@ -494,8 +490,8 @@ impl Editor {
     fn move_cursor(&mut self, key: Key) {
         let terminal_height = self.terminal.size().height as usize;
         let Position { mut y, mut x } = self.cursor_position;
-        let height = self.document.len();
-        let mut width = if let Some(row) = self.document.row(y) {
+        let height = self.documents[self.document_index].len();
+        let mut width = if let Some(row) = self.documents[self.document_index].row(y) {
             row.len()
         } else {
             0
@@ -518,7 +514,7 @@ impl Editor {
                     x -= 1;
                 } else if y > 0 {
                     y -= 1;
-                    if let Some(row) = self.document.row(y) {
+                    if let Some(row) = self.documents[self.document_index].row(y) {
                         x = row.len();
                     } else {
                         x = 0;
@@ -559,7 +555,7 @@ impl Editor {
             Key::End => x = width,
             _ => (),
         }
-        width = if let Some(row) = self.document.row(y) {
+        width = if let Some(row) = self.documents[self.document_index].row(y) {
             row.len()
         } else {
             0
@@ -587,9 +583,11 @@ impl Editor {
         let height = self.terminal.size().height;
         for terminal_row in 0..height {
             Terminal::clear_current_line();
-            if let Some(row) = self.document.row(terminal_row as usize + self.offset.y) {
+            if let Some(row) =
+                self.documents[self.document_index].row(terminal_row as usize + self.offset.y)
+            {
                 self.draw_row(row);
-            } else if self.document.is_empty() && terminal_row == height / 3 {
+            } else if self.documents[self.document_index].is_empty() && terminal_row == height / 3 {
                 self.draw_welcome_message();
             } else {
                 println!("~\r");
