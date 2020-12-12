@@ -1,3 +1,4 @@
+mod browser;
 mod document;
 mod editor;
 mod filetype;

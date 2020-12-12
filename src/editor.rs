@@ -463,7 +463,7 @@ impl Editor {
         let mut open_document_display = String::new();
         for document in &self.documents {
             match &document.file_name {
-                Some(file_name) => open_document_display += &file_name.to_string(),
+                Some(file_name) => open_document_display += &format!(" {}", &file_name).to_string(),
                 None => (),
             }
         }
