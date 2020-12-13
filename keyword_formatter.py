@@ -16,7 +16,9 @@ def main():
 
     print("secondary_keywords: vec![")
     for word in secondary_word_list:
-        print(f'\t"{word}".to_string(),')
+        # check that there are no duplicate words
+        if word not in primary_word_list:
+            print(f'\t"{word}".to_string(),')
     print("],")
 
     print("You can now add the keywords to the src/filetype.rs folder.")

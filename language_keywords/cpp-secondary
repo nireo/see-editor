@@ -1,0 +1,17 @@
+void
+bool
+true
+false
+char
+wchar_t
+char8_t
+char16_t
+char32_t
+size_t
+int
+short
+long
+unsigned
+signed
+float
+double
