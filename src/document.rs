@@ -14,9 +14,16 @@ pub struct Document {
 }
 
 impl Document {
+    // open returns a document based on a filename that is given as a parameter.
     pub fn open(filename: &str) -> Result<Self, std::io::Error> {
+        // Read the content of a file to a string.
         let content = fs::read_to_string(filename)?;
+
+        // Find the correct file type. If the filetype is not found, then we just set a default
+        // file type for the document.
         let file_type = FileType::from(filename);
+
+        // Go through the lines in the document.
         let mut rows = Vec::new();
         for value in content.lines() {
             let mut row = Row::from(value);
@@ -32,28 +39,36 @@ impl Document {
         })
     }
 
+    // Returns a reference to row at index
     pub fn row(&self, index: usize) -> Option<&Row> {
         self.rows.get(index)
     }
 
+    // Returns true if the current document is edited, and false if not.
     pub fn edited(&self) -> bool {
         self.edited
     }
 
+    // Return a boolean value about if the document is open or not.
     pub fn is_empty(&self) -> bool {
         self.rows.is_empty()
     }
 
+    // Return the amount of rows in a document.
     pub fn len(&self) -> usize {
         self.rows.len()
     }
 
+    // Return the document's filetype's name..
     pub fn file_type(&self) -> String {
         self.file_type.name()
     }
 
+    // delete handles the deletion of a character at a given position.
     pub fn delete(&mut self, at: &Position) {
         let len = self.len();
+
+        // We can't remove a character that isn't there.
         if at.y >= len {
             return;
         }
@@ -70,6 +85,7 @@ impl Document {
         }
     }
 
+    // Insert a given char into a given position in a document.
     pub fn insert(&mut self, at: &Position, c: char) {
         if at.y > self.rows.len() {
             return;
@@ -92,6 +108,8 @@ impl Document {
         }
     }
 
+    // Insert newline adds a new line, if the function is used from inside a row the row is
+    // splitted from that point.
     fn insert_newline(&mut self, at: &Position) {
         if at.y > self.len() {
             return;
@@ -108,6 +126,7 @@ impl Document {
         self.rows.insert(at.y + 1, new_row);
     }
 
+    // Save saves all of the changes made to a document into a file.
     pub fn save(&mut self) -> Result<(), Error> {
         if let Some(file_name) = &self.file_name {
             let mut file = fs::File::create(file_name)?;
@@ -124,6 +143,8 @@ impl Document {
         Ok(())
     }
 
+    // Find returns a position of an query in a document. The direction dictates if we move up or
+    // down in the searches.
     pub fn find(&self, query: &str, at: &Position, direction: SearchDirection) -> Option<Position> {
         let mut position = Position { x: at.y, y: at.y };
         let start = if direction == SearchDirection::Forward {

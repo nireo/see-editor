@@ -13,6 +13,8 @@ pub struct Row {
 }
 
 impl Row {
+    // The render method formats a row struct into string format, such that the string can be
+    // easily formatted on a terminal line.
     pub fn render(&self, start: usize, end: usize) -> String {
         let end = cmp::min(end, self.string.len());
         let start = cmp::min(start, end);

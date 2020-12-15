@@ -16,5 +16,6 @@ pub use row::Row;
 pub use terminal::Terminal;
 
 fn main() {
+    // Run the editor instance
     Editor::default().run();
 }

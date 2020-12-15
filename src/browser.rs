@@ -2,19 +2,16 @@ use std::fs;
 use std::io;
 use std::path;
 
+// Added a base for a browser
+#[derive(Default)]
 pub struct Browser {
-    main_dir: String,
-    files: Vec<path::PathBuf>,
+    main_dir: String,          // The base directory which includes all the `files`.
+    files: Vec<path::PathBuf>, // A list of path buffers in the main directory
 }
 
 impl Browser {
-    pub fn default(starting_dir: &str) -> Self {
-        Self {
-            main_dir: starting_dir.to_string(),
-            files: Vec::new(),
-        }
-    }
-
+    // update_main_dir takes in a new directory and updates self's main directory and finds all the
+    // files in the new directory and updates the files list.
     fn update_main_dir(&mut self, new_dir: &str) -> io::Result<()> {
         let mut files = fs::read_dir(new_dir)?
             .map(|res| res.map(|e| e.path()))
