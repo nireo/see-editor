@@ -45,19 +45,20 @@ enum EditorMode {
 
 #[derive(PartialEq)]
 enum FileMoveDirection {
-    Left,
-    Right,
+    Left,  // Move 1->0
+    Right, // Move 0->1
 }
 
 pub struct Editor {
-    quit: bool,
-    terminal: Terminal,
-    cursor_position: Position,
-    offset: Position,
-    status_message: StatusMessage,
-    editor_mode: EditorMode,
-    documents: Vec<Document>,
-    document_index: usize,
+    quit: bool,                    // A quit signal
+    terminal: Terminal,            // Different terminal controls
+    cursor_position: Position,     // The coordinates of a cursor
+    offset: Position,              // How much the screen is offset from the original view
+    status_message: StatusMessage, // The message displayed at the bottom of the screen
+    editor_mode: EditorMode,       // The mode the user is in; either View or Insert
+    documents: Vec<Document>,      // A list of all the open documents
+    document_index: usize,         // A field to keep track of the open document
+    previous_key: termion::event::Key,
 }
 
 impl Editor {
@@ -233,6 +234,11 @@ impl Editor {
                 Key::Char('h') => self.move_cursor(Key::Left),
                 Key::Char('k') => self.move_cursor(Key::Up),
                 Key::Char('l') => self.move_cursor(Key::Right),
+                Key::Char('g') => {
+                    if self.previous_key == Key::Char('g') {
+                        self.move_cursor(Key::End);
+                    }
+                }
                 Key::Ctrl('q') => self.check_exit_without_saving(),
                 Key::Ctrl('s') => self.handle_file_save(),
                 Key::Ctrl('z') => self.close_current_file(),
@@ -244,6 +250,9 @@ impl Editor {
                 Key::Right => self.move_in_documents(FileMoveDirection::Right),
                 _ => (),
             }
+
+            // Store the previous key so we can have keybindings that use more than two keys
+            self.previous_key = pressed_key;
         } else if self.editor_mode == EditorMode::Insert {
             // Handle the keypresses in the insert mode, in which the user can edit the document.
             match pressed_key {
@@ -424,6 +433,7 @@ impl Editor {
             editor_mode: EditorMode::View,
             documents: vec![document],
             document_index: 0,
+            previous_key: termion::event::Key::Null,
         }
     }
 
