@@ -173,6 +173,28 @@ impl Editor {
         }
     }
 
+    // Handles different commands from the editor prompt. Similar to the text prompt in vim when
+    // typing ':'.
+    fn handle_command(&mut self) {
+        let command = self.prompt(": ", |_, _, _| {}).unwrap_or(None);
+
+        if command.is_some() {
+            // Match the command by the user to some other commands.
+            match command.unwrap().as_str() {
+                "s" => self.handle_file_save(),
+                "sq" => {
+                    // Save the file
+                    self.handle_file_save();
+
+                    // The function also does not request the user to give any information if the
+                    // file is already saved, this is why we first save the file.
+                    self.check_exit_without_saving();
+                }
+                _ => (),
+            }
+        }
+    }
+
     // Search for a word in the current document. The user can move in the order from left-to-right
     // and vice versa. The user will type the search term in the prompt field and highlight all the
     // matching words.
@@ -234,6 +256,7 @@ impl Editor {
                 Key::Char('h') => self.move_cursor(Key::Left),
                 Key::Char('k') => self.move_cursor(Key::Up),
                 Key::Char('l') => self.move_cursor(Key::Right),
+                Key::Char(':') => self.handle_command(),
                 Key::Char('g') => {
                     if self.previous_key == Key::Char('g') {
                         self.move_cursor(Key::End);
