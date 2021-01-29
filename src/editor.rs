@@ -176,7 +176,7 @@ impl Editor {
     // Handles different commands from the editor prompt. Similar to the text prompt in vim when
     // typing ':'.
     fn handle_command(&mut self) {
-        let command = self.prompt(": ", |_, _, _| {}).unwrap_or(None);
+        let command = self.prompt(":", |_, _, _| {}).unwrap_or(None);
 
         if command.is_some() {
             // Match the command by the user to some other commands.
@@ -190,7 +190,26 @@ impl Editor {
                     // file is already saved, this is why we first save the file.
                     self.check_exit_without_saving();
                 }
+                "sae" => {
+                    self.save_all_documents();
+                    // since the comamnd ends with 'e' we will quit the editor
+                    self.quit = true;
+                }
+                "sa" => {
+                    self.save_all_documents();
+                }
                 _ => (),
+            }
+        }
+    }
+
+    // Save all buffers saves each buffer without asking the user for any kind of input.
+    fn save_all_documents(&mut self) {
+        for doc in &mut self.documents {
+            if doc.save().is_ok() {
+                self.status_message = StatusMessage::from("file saved".to_string());
+            } else {
+                self.status_message = StatusMessage::from("error writing file".to_string());
             }
         }
     }

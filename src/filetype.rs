@@ -36,9 +36,9 @@ impl FileType {
             return Self {
                 name: String::from("rust"),
                 highlight_opts: HighlightOptions {
-                    numbers: true,
-                    strings: true,
-                    characters: true,
+                    numbers: false,
+                    strings: false,
+                    characters: false,
                     comments: true,
                     primary_keywords: vec![
                         "as".to_string(),
