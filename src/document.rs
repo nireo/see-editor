@@ -39,6 +39,15 @@ impl Document {
         })
     }
 
+    pub fn default(file_name: &str) -> Self {
+        Document {
+            edited: false,
+            file_type: FileType::default(),
+            rows: Vec::new(),
+            file_name: Some(file_name.to_string()),
+        }
+    }
+
     // Returns a reference to row at index
     pub fn row(&self, index: usize) -> Option<&Row> {
         self.rows.get(index)

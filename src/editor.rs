@@ -420,7 +420,7 @@ impl Editor {
     // unnamed document without content.
     fn open_new_file(&mut self) {
         let filename = self.prompt("new filepath: ", |_, _, _| {}).unwrap_or(None);
-        let mut final_document = Document::default();
+        let mut final_document = Document::default("");
 
         // Check that the filename is not invalid
         if filename.is_some() {
@@ -451,20 +451,22 @@ impl Editor {
         // Take a filename as an argument to the program.
         let args: Vec<String> = env::args().collect();
         let mut initial_status = String::from("ctrl-q quit | ctrl-s save | ctrl-f search");
-        let document = if args.len() > 1 {
-            // If the filename is valid open that file in the editor, otherwise open an empty file
-            // in the editor.
-            let file_name = &args[1];
-            let doc = Document::open(&file_name);
-            if doc.is_ok() {
-                doc.unwrap()
-            } else {
-                initial_status = format!("could not open file '{}'", file_name);
-                Document::default()
+        // create new buffers for each of the arguments
+        let mut documents: Vec<Document> = Vec::new();
+        if args.len() > 1 {
+            for i in 1..args.len() {
+                let file_name = &args[i];
+                let doc = Document::open(&file_name);
+                if doc.is_ok() {
+                    documents.push(doc.unwrap());
+                } else {
+                    initial_status = format!("cound not find {}, creating a new buffer", file_name);
+                    documents.push(Document::default(file_name))
+                }
             }
         } else {
-            Document::default()
-        };
+            documents.push(Document::default(""));
+        }
 
         Self {
             quit: false,
@@ -473,7 +475,7 @@ impl Editor {
             offset: Position::default(),
             status_message: StatusMessage::from(initial_status),
             editor_mode: EditorMode::View,
-            documents: vec![document],
+            documents: documents,
             document_index: 0,
             previous_key: termion::event::Key::Null,
         }
